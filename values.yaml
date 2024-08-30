@@ -1,0 +1,288 @@
+##################################################################################################
+# autoscaling enabled:true ise replicaCount geçersizdir.
+# kubernetes nesnelerinin(deployment,replicaset,statefullset) kaç replica çalıştırıcağın belirtir.
+##################################################################################################
+replicaCount: 1
+
+#############################################################################################
+# IfNotPresent: İmajı sadece yerel olarak mevcut değilse çeker. 
+# Always: Her defasında imajı registry'den çeker.
+# Never: Hiçbir zaman imajı registry'den çekmez. Yalnızca yerel olarak mevcut imajı kullanır.
+############################################################################################
+image:
+  repository: postgres
+  pullPolicy: IfNotPresent
+  tag: "16.4"
+
+imagePullSecrets: []
+
+############################################################################
+#Helm chart'ınızın varsayılan olarak kullandığı(Chart.yaml dosyasındaki) ismin üzerine yazmanıza olanak tanır.
+############################################################################
+nameOverride: ""
+
+############################################################################
+#Helm chart'ınızın varsayılan olarak oluşturduğu tam ismi üzerine yazmanıza olanak tanır.
+############################################################################
+fullnameOverride: ""
+
+############################################################################
+#automount ServiceAccount'un pod'lara otomatik olarak bağlı olup olmayacağını belirler.
+#annotations açıklayıcı bilgileri sağlamak amacıyla kullanılır.
+############################################################################
+serviceAccount:
+  create: true
+  automount: true
+  annotations:
+    example.com/description: "This is an example application."
+    example.com/created-by: "John Doe"
+  name: "serviceaccountname"
+
+############################################################################
+#Pod'lara ek metadata eklemek için kullanılır.
+############################################################################
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+
+############################################################################
+#Etiketler, kaynakları seçmek ve gruplamak için kullanılır
+############################################################################
+podLabels:
+  app: my-app
+  environment: production
+
+############################################################################
+#Pod'un tüm konteynerleri için güvenlik yapılandırmalarını belirler.
+############################################################################
+podSecurityContext:
+  fsGroup: 1001
+  runAsUser: 1000
+
+############################################################################
+#bir konteynerin çalışma zamanı güvenlik yapılandırmalarını belirler.
+#NET_ADMIN Yüksek güvenlik riski içerir gerekli olduğu durumlarda kullanılması tavsiye edilir.
+############################################################################
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  seccompProfile:
+    type: RuntimeDefault
+    #Bu kısımdaki capabilities.add'i gerektiği durumlarda açabilirsiniz.(Yüksek Risk)
+    #capabilities:
+       #add:
+       #   - NET_ADMIN
+
+############################################################################
+#name: servis için verilen adıdır.Bu adı kullanarak servisi tanımlar ve bu ad aracılığıyla erişebilirsiniz.
+#type: 
+#ClusterIp (Varsayılan servis türüdür. Servis, yalnızca Kubernetes kümesindeki diğer pod'lar tarafından erişilebilir. Dışarıdan erişim sağlanamaz.) 
+#NodePort, (Servis, tüm node'larda belirli bir port üzerinden dış dünyaya açılır. Her node'un bu portta gelen trafiği ilgili servise yönlendirir. NodePort port numaraları genellikle 30000 ile 32767 arasında olmalıdır.)
+#LoadBalancer (Servis, bir yük dengeleyici (load balancer) aracılığıyla dış dünyaya açılır. Bulut sağlayıcıları (AWS, GCP, Azure gibi) genellikle otomatik olarak bu yük dengeleyiciyi oluşturur.) 
+#targetPort : (Dockerfileda EXPOSE ettiğiniz PORT ile aynı değer olmalıdır.)
+#port, Güvenlik Politikalarına uygun olması için 1024'ten büyük olmalıdır.!!
+############################################################################
+service:
+  name: "servicename"
+  type: NodePort
+  port: 8080
+  targetPort: 8080
+  nodePort: 31001
+
+############################################################################
+#Ingress, Kubernetes kümelerinde dış trafiği iç servislere yönlendirmek için kullanılır.
+#className: (Opsiyonel) Bu Ingress kaynağı için kullanılacak Ingress sınıfını belirtir.
+#host: Bu alan adı (DNS adı) üzerine gelen istekleri tanımlar.
+#path: Yönlendirme kurallarında kullanılan yol. Örneğin, /app veya /.
+#pathType: pathType: Yol eşlemesi türünü belirtir. Prefix (ön ek) veya Exact (tam eşleşme) olabilir.
+#tls_hosts: HTTPS için TLS sertifikası uygulanacak alan adlarını belirtir.
+#secretName: TLS sertifikasını içeren Secret nesnesinin adı. Sertifika bu Secret'ta saklanır.
+############################################################################
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: example.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+    - hosts:
+        - example.com
+      secretName: example-tls-secret
+
+############################################################################
+#resources alanı, Kubernetes'te bir Pod'un veya Container'ın CPU ve bellek gibi kaynaklarının ne kadarını kullanabileceğini tanımlamak için kullanılır
+############################################################################
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+#livenessProbe:
+#  httpGet:
+#    path: /
+#    port: http
+#readinessProbe:
+#  httpGet:
+#    path: /
+#    port: http
+
+############################################################################
+#HPA, uygulamanızın yüküne bağlı olarak Pod'ların sayısını otomatik olarak ayarlayabilen bir mekanizmadır.
+############################################################################
+autoscaling:
+  name: "autoscalingname"
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+#############################################################################
+#volumes: Pod içindeki bir veya daha fazla container arasında veri paylaşmak için kullanılan depolama alanlarını tanımlar.
+#############################################################################
+volumes:
+  - name: config-volume
+    configMap:
+      name: configname
+
+#############################################################################
+#volumeMounts: Tanımlanan volumes'ları container'lara bağlar. Bu, bir volume'un container içindeki belirli bir dosya dizinine monte edilmesini sağlar.
+#############################################################################
+volumeMounts:
+  - name: config-volume
+    mountPath: /etc/config
+
+#############################################################################
+#nodeSelector: Pod'ların belirli etiketlere sahip düğümlerde (node) çalışmasını sağlar.
+#############################################################################
+#nodeSelector:
+ # disktype: ssd
+
+#############################################################################
+#tolerations: Pod'ların belirli node'lara yerleştirilmesi için tolerans tanımlar.
+#############################################################################
+tolerations:
+  - key: "key1"
+    operator: "Equal"
+    value: "value1"
+    effect: "NoSchedule"
+
+#############################################################################
+#affinity: Pod yerleştirme tercihlerini tanımlar. affinity, Pod'ların hangi düğümlerde veya bölgelerde çalışmasını istediğinizi belirler.
+#kubectl label nodes NODE_NAME key=value ile key,value ilişkisi kurulabilir.
+#burdaki örnekte minikube(node) etiketi key=test, value=etiya'dır.
+#############################################################################
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: test
+              operator: In
+              values:
+                - etiya
+
+
+############################################################################
+#ConfigMap, bir uygulamanın yapılandırma bilgilerini Kubernetes kümesine dışarıdan yüklemenizi sağlar ve bu bilgileri birden fazla pod arasında paylaşabilirsiniz.
+############################################################################
+configMap:
+  enabled: true
+  name: "configname"
+  data:
+    logLevel: info
+    serverPort: "8080"
+
+############################################################################
+#Secret, hassas bilgileri (örneğin, parolalar, token'lar, şifreler) güvenli bir şekilde saklamak ve yönetmek için kullanılan bir kaynak türüdür. 
+############################################################################
+secret:
+  enabled: true
+  name: "secretname"
+  data:
+    username: YWRtaW4=      # "admin" base64 ile kodlanmış
+    password: c2VjcmV0      # "secret" base64 ile kodlanmış
+    POSTGRES_PASSWORD: "c2lmcmU="
+
+############################################################################
+#PersistentVolumeClaim (PVC), bir pod'un kalıcı veri depolama gereksinimlerini karşılamak için kullanılan bir kaynak türüdür.
+#ReadWriteOnce: Depolama alanı bir pod tarafından okunup yazılabilir.
+#ReadOnlyMany: Depolama alanı birden fazla pod tarafından sadece okunabilir.
+#ReadWriteMany: Depolama alanı birden fazla pod tarafından okunup yazılabilir.
+############################################################################
+persistentVolumeClaim:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+############################################################################
+#Role, belirli bir namespace içindeki kaynaklara erişim izinlerini tanımlayan bir kaynaktır.
+############################################################################
+role:
+  enabled: true
+  name: "etiyarole"
+  namespace: "default"
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "pods/log"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets"]
+      verbs: ["get", "list", "watch"]
+
+############################################################################
+#RoleBinding,bir rolü belirli bir kullanıcı, grup veya hizmet hesabına atamak için kullanılan bir kaynaktır. 
+############################################################################
+roleBinding:
+  enabled: true
+  name: "etiyabinding"
+  roleRef:
+    apiGroup: "rbac.authorization.k8s.io"
+    kind: "Role"
+    name: "etiyarole"
+  subjects:
+    - kind: ServiceAccount
+      name: default
+      namespace: default
+############################################################################
+#ClusterRole, tüm küme (cluster) genelinde geçerli olan bir rol türüdür ve küme genelindeki kaynaklara erişim izinlerini tanımlar.
+############################################################################
+clusterRole:
+  enabled: true
+  name: "etiyacluster"
+  rules:
+  # `nodes` kaynağı için izinler
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # `deployments` ve `replicasets` kaynakları için izinler
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]  # İhtiyaç duyulan izinler
+
+############################################################################
+#ClusterRoleBinding, ClusterRole'ü küme genelinde kullanıcılar, gruplar veya hizmet hesapları ile ilişkilendirmek için kullanılan bir kaynaktır.
+############################################################################
+clusterRoleBinding:
+  enabled: true
+  name: "etiyaclusterbinding"
+  roleRef:
+    apiGroup: "rbac.authorization.k8s.io"
+    kind: "ClusterRole"
+    name: "etiyacluster"
+  subjects:
+    - kind: ServiceAccount
+      name: default
+      namespace: default
